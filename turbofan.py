@@ -29,12 +29,23 @@ def generate_temp_file(model, file_format, tessellation):
     elif file_format.lower() == "step":
         file_suffix = ".step"
         export_type = cq.exporters.ExportTypes.STEP
+
+    elif file_format.lower() == "gltf":
+        file_suffix = ".gltf"
+        assy = cq.Assembly()
+        assy.add(model, color=cq.Color("magenta"), name="turbofan")
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_suffix) as tmpfile:
+            assy.export(tmpfile.name)
+            return tmpfile.name
+
     else:
         raise ValueError(f"Unsupported file format: {file_format}")
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=file_suffix) as tmpfile:
         cq.exporters.export(model, tmpfile.name, exportType=export_type, tolerance=getattr(Tessellation, tessellation.upper()).value)
         return tmpfile.name
+
 
 @st.cache_data
 def generate_and_export_turbofan_cached(
@@ -91,8 +102,7 @@ with col1:
     tip_curve_id = REFINED_AIRFOILS_COLLECTION[family_tip]
 
 with col2:
-    tessellation_value = st.select_slider('Surface quality', options=[t.name.lower() for t in Tessellation])
-    blades_count = st.slider('Blades count (items)', min_value=2, max_value=10, value=2, step=1)
+    blades_count = st.slider('Blades count (items)', min_value=2, max_value=7, value=2, step=1)
     hub_dia = st.slider('Turbofan hub diameter', min_value=2.0, max_value=5.0, value=2.0, step=0.25)
     center_hole_dia = st.slider('Turbofan center hole diameter', min_value=0.5, max_value=hub_dia-0.5, value=1.0, step=0.25)
     root_twist_angle = st.slider('Root section twist angle (degree)', min_value=-90, max_value=0, value=-20, step=1)
@@ -106,9 +116,11 @@ with col2:
     middle_offset = st.slider('Middle section offset', min_value=1, max_value=10, value=2, step=1)
     tip_offset = st.slider('Tip section offset', min_value=1, max_value=10, value=3, step=1)
 
+    tessellation_value = st.select_slider('Surface quality of downloaded model', options=[t.name.lower() for t in Tessellation])
+
 
 # ----------------------- Visualization ----------------------- #
-file_path_stl = generate_and_export_turbofan_cached(
+file_path_gltf = generate_and_export_turbofan_cached(
     _root_curve=root_curve_id,
     _middle_curve=middle_curve_id,
     _tip_curve=tip_curve_id,
@@ -120,27 +132,7 @@ file_path_stl = generate_and_export_turbofan_cached(
     tip_chord_ratio=tip_chord,
     tip_offset_distance=tip_offset,
     tip_twist=tip_twist_angle,
-    file_format="stl",
-    tessellation=tessellation_value,
-    vanes_count=blades_count,
-    hub_diameter=hub_dia,
-    center_hole_diameter=center_hole_dia,
-)
-
-
-file_path_step = generate_and_export_turbofan_cached(
-    _root_curve=root_curve_id,
-    _middle_curve=middle_curve_id,
-    _tip_curve=tip_curve_id,
-    root_chord_ratio=root_chord,
-    root_twist=root_twist_angle,
-    middle_chord_ratio=middle_chord,
-    middle_offset_distance=middle_offset,
-    middle_twist=middle_twist_angle,
-    tip_chord_ratio=tip_chord,
-    tip_offset_distance=tip_offset,
-    tip_twist=tip_twist_angle,
-    file_format="step",
+    file_format="gltf",
     tessellation=tessellation_value,
     vanes_count=blades_count,
     hub_diameter=hub_dia,
@@ -150,26 +142,66 @@ file_path_step = generate_and_export_turbofan_cached(
 if os.getenv("OS_TYPE") != "windows":
     pv.start_xvfb()
 
-mesh = pv.read(file_path_stl)
-
 plotter = pv.Plotter(window_size=[500, 500])
-plotter.add_mesh(mesh)
-plotter.view_isometric()
+plotter.import_gltf(file_path_gltf)
+plotter.view_yx()
 plotter.set_background("#0e1117")
 
 with col3:
     stv(plotter, key=f"turbofan_{datetime.now()}")
-    with open(file_path_stl, 'rb') as stl_file:
-        st.download_button(
-            label="Download STL File",
-            data=stl_file,
-            file_name="gear.stl",
-            mime="application/vnd.ms-pki.stl",
+
+    if st.button("Generate & Download STL"):
+        file_path_stl = generate_and_export_turbofan_cached(
+            _root_curve=root_curve_id,
+            _middle_curve=middle_curve_id,
+            _tip_curve=tip_curve_id,
+            root_chord_ratio=root_chord,
+            root_twist=root_twist_angle,
+            middle_chord_ratio=middle_chord,
+            middle_offset_distance=middle_offset,
+            middle_twist=middle_twist_angle,
+            tip_chord_ratio=tip_chord,
+            tip_offset_distance=tip_offset,
+            tip_twist=tip_twist_angle,
+            file_format="stl",
+            tessellation=tessellation_value,
+            vanes_count=blades_count,
+            hub_diameter=hub_dia,
+            center_hole_diameter=center_hole_dia,
         )
-    with open(file_path_step, 'rb') as step_file:
-        st.download_button(
-            label=f"Download STEP File",
-            data=step_file,
-            file_name=f"gear.step",
-            mime="application/step",
+
+        with open(file_path_stl, 'rb') as stl_file:
+            st.download_button(
+                label="Download STL File",
+                data=stl_file,
+                file_name="turbofan.stl",
+                mime="application/vnd.ms-pki.stl",
+            )
+
+    if st.button("Generate & Download STEP"):
+        file_path_step = generate_and_export_turbofan_cached(
+            _root_curve=root_curve_id,
+            _middle_curve=middle_curve_id,
+            _tip_curve=tip_curve_id,
+            root_chord_ratio=root_chord,
+            root_twist=root_twist_angle,
+            middle_chord_ratio=middle_chord,
+            middle_offset_distance=middle_offset,
+            middle_twist=middle_twist_angle,
+            tip_chord_ratio=tip_chord,
+            tip_offset_distance=tip_offset,
+            tip_twist=tip_twist_angle,
+            file_format="step",
+            tessellation=tessellation_value,
+            vanes_count=blades_count,
+            hub_diameter=hub_dia,
+            center_hole_diameter=center_hole_dia,
         )
+
+        with open(file_path_step, 'rb') as step_file:
+            st.download_button(
+                label=f"Download STEP File",
+                data=step_file,
+                file_name=f"turbofan.step",
+                mime="application/step",
+            )
