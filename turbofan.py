@@ -20,8 +20,10 @@ class Tessellation(Enum):
     FINE = 1e-5
 
 
-def generate_temp_file(model, file_format, tessellation):
+def generate_temp_file(model, file_format, tessellation=None):
     """Generates a temporary file with the specified STL or STEP format."""
+    tolerance = getattr(Tessellation, tessellation.upper()).value if tessellation else Tessellation.MEDIUM.value
+
     if file_format.lower() == "stl":
         file_suffix = ".stl"
         export_type = cq.exporters.ExportTypes.STL
@@ -43,7 +45,7 @@ def generate_temp_file(model, file_format, tessellation):
         raise ValueError(f"Unsupported file format: {file_format}")
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=file_suffix) as tmpfile:
-        cq.exporters.export(model, tmpfile.name, exportType=export_type, tolerance=getattr(Tessellation, tessellation.upper()).value)
+        cq.exporters.export(model, tmpfile.name, exportType=export_type, tolerance=tolerance)
         return tmpfile.name
 
 
@@ -61,10 +63,10 @@ def generate_and_export_turbofan_cached(
     tip_offset_distance,
     tip_twist,
     file_format,
-    tessellation,
     vanes_count,
     hub_diameter,
-    center_hole_diameter
+    center_hole_diameter,
+    tessellation = None,
 ):
     sections = [
         AirfoilSection(_root_curve, root_chord_ratio, 0, root_twist),
@@ -116,7 +118,7 @@ with col2:
     middle_offset = st.slider('Middle section offset', min_value=1, max_value=10, value=2, step=1)
     tip_offset = st.slider('Tip section offset', min_value=1, max_value=10, value=3, step=1)
 
-    tessellation_value = st.select_slider('Surface quality of downloaded model', options=[t.name.lower() for t in Tessellation])
+    # tessellation_value = st.select_slider('Surface quality of downloaded model', options=[t.name.lower() for t in Tessellation])
 
 
 # ----------------------- Visualization ----------------------- #
@@ -133,7 +135,7 @@ file_path_gltf = generate_and_export_turbofan_cached(
     tip_offset_distance=tip_offset,
     tip_twist=tip_twist_angle,
     file_format="gltf",
-    tessellation=tessellation_value,
+    # tessellation=tessellation_value,
     vanes_count=blades_count,
     hub_diameter=hub_dia,
     center_hole_diameter=center_hole_dia,
@@ -164,7 +166,7 @@ with col3:
             tip_offset_distance=tip_offset,
             tip_twist=tip_twist_angle,
             file_format="stl",
-            tessellation=tessellation_value,
+            # tessellation=tessellation_value,
             vanes_count=blades_count,
             hub_diameter=hub_dia,
             center_hole_diameter=center_hole_dia,
@@ -176,6 +178,8 @@ with col3:
                 data=stl_file,
                 file_name="turbofan.stl",
                 mime="application/vnd.ms-pki.stl",
+                on_click="ignore",
+                icon=":material/download:"
             )
 
     if st.button("Generate & Download STEP"):
@@ -192,7 +196,7 @@ with col3:
             tip_offset_distance=tip_offset,
             tip_twist=tip_twist_angle,
             file_format="step",
-            tessellation=tessellation_value,
+            # tessellation=tessellation_value,
             vanes_count=blades_count,
             hub_diameter=hub_dia,
             center_hole_diameter=center_hole_dia,
@@ -204,4 +208,6 @@ with col3:
                 data=step_file,
                 file_name=f"turbofan.step",
                 mime="application/step",
+                on_click="ignore",
+                icon=":material/download:"
             )
