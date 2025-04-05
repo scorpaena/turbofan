@@ -1,11 +1,20 @@
 services:
   streamlit_gear_app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: maxeval/turbofan:latest
     container_name: streamlit_turbofan_app
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8501:8501"
     environment:
      - OS_TYPE=linux
     volumes:
      - .:/app
     restart: always
+    command:
+      - streamlit
+      - run
+      - turbofan.py
+      - --server.port=8501
+      - --server.address=0.0.0.0

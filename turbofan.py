@@ -1,7 +1,7 @@
 import os
 from enum import Enum
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import cadquery as cq
 import streamlit as st
@@ -49,7 +49,7 @@ def generate_temp_file(model, file_format, tessellation=None):
         return tmpfile.name
 
 
-@st.cache_data
+@st.cache_data(ttl=timedelta(hours=0.5), max_entries=10)
 def generate_and_export_turbofan_cached(
     _root_curve,
     _middle_curve,
